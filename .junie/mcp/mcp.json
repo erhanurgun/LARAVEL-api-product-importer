@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "C:\\laragon\\bin\\php\\php-8.4.10\\php.exe",
+            "args": [
+                "D:\\PROJECTS\\.github\\erhanurgun\\LARAVEL\\LARAVEL-api-product-importer\\api-importer\\artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}
