@@ -2,29 +2,23 @@
 
 namespace App\Services;
 
+use App\Contracts\ApiClientInterface;
+use App\DataTransferObjects\ApiResponse;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 
-class ProductApiClient
+final class ProductApiClient implements ApiClientInterface
 {
-    private const MAX_RETRIES = 3;
-
-    private const RETRY_DELAY_MS = 1000;
-
     public function __construct(
         private readonly string $baseUrl,
         private readonly ?string $apiKey = null,
+        private readonly int $maxRetries = 3,
+        private readonly int $retryDelayMs = 1000,
     ) {}
 
-    /**
-     * Fetch products from the API with pagination.
-     *
-     * @param  int  $page  Page number to fetch
-     * @return array{data: array, current_page: int, last_page: int, total: int}
-     */
-    public function fetchProducts(int $page = 1): array
+    public function fetchProducts(int $page = 1): ApiResponse
     {
         $response = $this->makeRequest(
             url: '',
@@ -33,42 +27,7 @@ class ProductApiClient
             ]
         );
 
-        return $this->normalizeResponse($response);
-    }
-
-    /**
-     * Normalize API response to expected format.
-     *
-     * @param  array<string, mixed>  $response
-     * @return array{data: array, current_page: int, last_page: int, total: int}
-     */
-    private function normalizeResponse(array $response): array
-    {
-        $pagination = $response['data']['pagination'] ?? [];
-        $products = $response['data']['products'] ?? [];
-
-        return [
-            'data' => $products,
-            'current_page' => $pagination['current_page'] ?? 1,
-            'last_page' => $this->extractLastPage($pagination),
-            'total' => $pagination['total'] ?? count($products),
-        ];
-    }
-
-    /**
-     * Extract last page number from pagination data.
-     *
-     * @param  array<string, mixed>  $pagination
-     */
-    private function extractLastPage(array $pagination): int
-    {
-        if (isset($pagination['last_page_url']) && is_string($pagination['last_page_url'])) {
-            parse_str(parse_url($pagination['last_page_url'], PHP_URL_QUERY) ?? '', $params);
-
-            return (int) ($params['page'] ?? 1);
-        }
-
-        return $pagination['total'] ?? 1;
+        return ApiResponse::fromArray($response);
     }
 
     /**
@@ -81,7 +40,7 @@ class ProductApiClient
     {
         $attempt = 0;
 
-        while ($attempt < self::MAX_RETRIES) {
+        while ($attempt < $this->maxRetries) {
             try {
                 $response = $this->buildClient()
                     ->get($this->baseUrl.$url, $params)
@@ -136,11 +95,11 @@ class ProductApiClient
      */
     private function handleRetry(int $attempt, \Throwable $exception): void
     {
-        if ($attempt >= self::MAX_RETRIES - 1) {
+        if ($attempt >= $this->maxRetries - 1) {
             throw $exception;
         }
 
-        $delay = self::RETRY_DELAY_MS * (2 ** $attempt);
+        $delay = $this->retryDelayMs * (2 ** $attempt);
         usleep($delay * 1000);
     }
 }

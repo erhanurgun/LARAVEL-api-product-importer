@@ -31,10 +31,10 @@ it('fetches products successfully', function () {
 
     $response = $client->fetchProducts(page: 1);
 
-    expect($response['data'])->toBeArray()
-        ->and($response['data'])->toHaveCount(2)
-        ->and($response['current_page'])->toBe(1)
-        ->and($response['last_page'])->toBe(5);
+    expect($response->data)->toBeArray()
+        ->and($response->data)->toHaveCount(2)
+        ->and($response->currentPage)->toBe(1)
+        ->and($response->lastPage)->toBe(5);
 });
 
 it('includes authorization header when api key is provided', function () {
@@ -90,7 +90,7 @@ it('retries on 429 status code', function () {
 
     $response = $client->fetchProducts();
 
-    expect($response['data'])->toBeArray();
+    expect($response->data)->toBeArray();
     Http::assertSentCount(3);
 });
 
@@ -109,7 +109,7 @@ it('retries on 500 server error', function () {
 
     $response = $client->fetchProducts();
 
-    expect($response['data'])->toBeArray();
+    expect($response->data)->toBeArray();
     Http::assertSentCount(3);
 });
 

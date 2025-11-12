@@ -131,44 +131,144 @@ Sistem, her başarılı sayfa içe aktarımından sonra otomatik olarak checkpoi
 
 ## Mimari
 
-### Servis Katmanı
+Uygulama **SOLID prensipleri** doğrultusunda tamamen refactor edilmiş, temiz kod prensiplerine (DRY, KISS, YAGNI) %100 uyumlu, enterprise-grade bir mimari kullanmaktadır.
 
-Uygulama, temiz bir servis odaklı mimari izler:
+### Mimari Katmanlar
+
+```
+app/
+├── Contracts/              # Interface'ler (Dependency Inversion)
+├── ValueObjects/           # Immutable değer nesneleri
+├── DataTransferObjects/    # Veri aktarım nesneleri
+├── Services/               # İş mantığı servisleri
+├── Console/Commands/       # CLI komutları (sadece orkestrasyon)
+└── Models/                 # Eloquent modeller
+```
+
+### 1. Contracts (Interfaces)
+
+**Dependency Inversion Principle** uygulanarak tüm servisler interface'ler üzerinden tanımlanmıştır:
+
+- `ApiClientInterface`: API iletişim kontratı
+- `RateLimiterInterface`: Rate limiting kontratı
+- `ValidatorInterface`: Validasyon kontratı
+- `DataMapperInterface`: Veri eşleme kontratı
+- `SerializerInterface`: Serileştirme kontratı
+- `CheckpointManagerInterface`: Checkpoint yönetim kontratı
+- `FormatterServiceInterface`: Formatlama kontratı
+
+### 2. Value Objects
+
+Immutable, type-safe domain nesneleri:
+
+#### Price (`app/ValueObjects/Price.php`)
+- İndirim hesaplamaları
+- Validasyon (negatif fiyat kontrolü)
+- Discount percentage hesaplama
+
+#### Location (`app/ValueObjects/Location.php`)
+- Şehir, ilçe, ülke bilgileri
+- Full address formatlama
+- Completeness kontrolü
+
+#### Stock (`app/ValueObjects/Stock.php`)
+- Miktar ve stok durumu
+- Availability, low stock kontrolleri
+- Business logic encapsulation
+
+#### ContainerInfo (`app/ValueObjects/ContainerInfo.php`)
+- Konteyner tipleri ve boyutları
+- Database format dönüşümü
+
+#### ProductImage (`app/ValueObjects/ProductImage.php`)
+- Cover ve thumbnail yönetimi
+- Image presence kontrolleri
+
+### 3. Data Transfer Objects (DTOs)
+
+#### ImportStatistics (`app/DataTransferObjects/ImportStatistics.php`)
+- İstatistik tracking ve hesaplamalar
+- Success rate, duration, memory usage
+- Average time per item hesaplama
+
+#### ApiResponse (`app/DataTransferObjects/ApiResponse.php`)
+- API yanıt normalizasyonu
+- Pagination helper metodları
+- Type-safe veri erişimi
+
+### 4. Servis Katmanı
+
+**Single Responsibility Principle** ile her servis tek bir sorumluluğa sahiptir:
 
 #### ProductApiClient
-`app/Services/ProductApiClient.php`
+`app/Services/ProductApiClient.php` → `ApiClientInterface`
 
 API iletişimini yönetir:
 - HTTP client yapılandırması
-- Otomatik yeniden deneme mantığı (exponential backoff ile maksimum 3 deneme)
-- Yanıt normalizasyonu
+- Configurable retry logic (exponential backoff)
+- ApiResponse DTO döndürür
 - API kimlik doğrulama desteği
 
 #### ApiRateLimiter
-`app/Services/ApiRateLimiter.php`
+`app/Services/ApiRateLimiter.php` → `RateLimiterInterface`
 
 API rate limiting'i yönetir:
-- Zaman penceresi başına yapılandırılabilir istek sayısı
-- Limite ulaşıldığında otomatik bekleme
-- Cache tabanlı istek takibi
-- Zaman penceresi yönetimi (60 saniyelik pencereler)
+- Configurable request limit
+- Automatic throttling
+- Cache-based tracking
+- 60 saniyelik time window
 
 #### ProductValidator
-`app/Services/ProductValidator.php`
+`app/Services/ProductValidator.php` → `ValidatorInterface`
 
 Ürün verilerini doğrular:
 - 30+ validasyon kuralı
-- Güvenli validasyon modu (exception fırlatmayan)
-- Tekil slug doğrulaması (opsiyonel)
-- Detaylı hata günlüğü
+- Safe validation (no exceptions)
+- Optional uniqueness check
+- Structured error logging
 
 #### ProductDataMapper
-`app/Services/ProductDataMapper.php`
+`app/Services/ProductDataMapper.php` → `DataMapperInterface`
 
 API yanıtını veritabanı formatına eşler:
-- İç içe veri yapılarını işler (fiyat, stok, görsel, konum, konteyner)
-- Verileri çıkarır ve normalleştirir
-- Varsayılan değer işleme
+- Nested data handling
+- Value object integration (optional)
+- Default value management
+
+#### ProductSerializer
+`app/Services/ProductSerializer.php` → `SerializerInterface`
+
+**DRY prensibi** ile JSON serialization logic tek yerde:
+- Array → JSON encoding
+- Batch serialization
+- Configurable field list
+
+#### CheckpointManager
+`app/Services/CheckpointManager.php` → `CheckpointManagerInterface`
+
+Checkpoint yönetimini izole eder:
+- Save/get/clear operations
+- TTL management
+- Cache-based persistence
+
+#### FormatterService
+`app/Services/FormatterService.php` → `FormatterServiceInterface`
+
+Display formatting tek yerde:
+- Duration formatting (h/m/s)
+- Byte formatting (KB/MB/GB)
+- Number formatting
+
+### 5. Command Layer
+
+#### ImportProducts
+`app/Console/Commands/ImportProducts.php`
+
+**Single Responsibility**: Sadece orkestrasyon yapar, business logic servislere delegedir:
+- **357 satırdan 308 satıra** düşürüldü (14% azalma)
+- **6 private property → 0** (DTO kullanımı sayesinde)
+- **Tüm helper metodlar** ilgili servislere taşındı
+- **Interface-based DI** kullanılarak test edilebilirlik artırıldı
 
 ### Veritabanı Şeması
 
@@ -303,9 +403,21 @@ Bu komut şunları başlatır:
 
 ### Service Provider
 
-`app/Providers/AppServiceProvider.php` şunları kayıt eder:
-- Yapılandırma ile ProductApiClient singleton
-- Rate limit ayarları ile ApiRateLimiter singleton
+`app/Providers/AppServiceProvider.php` **Dependency Injection Container** yapılandırması:
+
+**Interface → Implementation bindings:**
+- `ApiClientInterface` → `ProductApiClient`
+- `RateLimiterInterface` → `ApiRateLimiter`
+- `ValidatorInterface` → `ProductValidator`
+- `DataMapperInterface` → `ProductDataMapper`
+- `SerializerInterface` → `ProductSerializer`
+- `CheckpointManagerInterface` → `CheckpointManager`
+- `FormatterServiceInterface` → `FormatterService`
+
+**3 kategoriye ayrılmış kayıt:**
+1. **API Services**: Client + Rate Limiter
+2. **Data Services**: Mapper + Validator + Serializer
+3. **Utility Services**: Checkpoint + Formatter
 
 ### Günlük Tutma
 
@@ -313,11 +425,18 @@ Bu komut şunları başlatır:
 - Import hatalarına özel `import_errors` kanalı
 - Birden fazla log hedefi için stack yapılandırması
 
-### Servisler
+### Konfigürasyon
 
-`config/services.php` şunları içerir:
+#### config/services.php
 - Ürün API yapılandırması
 - Üçüncü taraf servis kimlik bilgileri
+
+#### config/import.php (YENİ)
+**Magic string'ler externalize edildi:**
+- Checkpoint ayarları (key, TTL)
+- Retry ayarları (max attempts, delay)
+- Batch size
+- Recoverable error patterns
 
 ## Çeviri
 

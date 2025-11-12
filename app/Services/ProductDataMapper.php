@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
-class ProductDataMapper
+use App\Contracts\DataMapperInterface;
+
+final class ProductDataMapper implements DataMapperInterface
 {
     /**
      * Map API product data to database format.

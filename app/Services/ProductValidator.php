@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
+use App\Contracts\ValidatorInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
-class ProductValidator
+final class ProductValidator implements ValidatorInterface
 {
     /**
      * Validate product data.

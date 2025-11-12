@@ -2,9 +2,10 @@
 
 namespace App\Services;
 
+use App\Contracts\RateLimiterInterface;
 use Illuminate\Support\Facades\Cache;
 
-class ApiRateLimiter
+final class ApiRateLimiter implements RateLimiterInterface
 {
     private const CACHE_KEY_PREFIX = 'api_rate_limiter:';
 
