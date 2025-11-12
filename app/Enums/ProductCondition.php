@@ -20,19 +20,4 @@ enum ProductCondition: string
             self::REFURBISHED => __('products.condition.refurbished'),
         };
     }
-
-    public function isNew(): bool
-    {
-        return $this === self::NEW;
-    }
-
-    public function isUsed(): bool
-    {
-        return $this === self::USED;
-    }
-
-    public function isRefurbished(): bool
-    {
-        return $this === self::REFURBISHED;
-    }
 }

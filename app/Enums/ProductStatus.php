@@ -20,19 +20,4 @@ enum ProductStatus: string
             self::ARCHIVED => __('products.status.archived'),
         };
     }
-
-    public function isPublished(): bool
-    {
-        return $this === self::PUBLISHED;
-    }
-
-    public function isDraft(): bool
-    {
-        return $this === self::DRAFT;
-    }
-
-    public function isArchived(): bool
-    {
-        return $this === self::ARCHIVED;
-    }
 }

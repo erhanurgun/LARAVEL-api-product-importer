@@ -6,11 +6,17 @@ use App\Contracts\FormatterServiceInterface;
 
 final class FormatterService implements FormatterServiceInterface
 {
+    private const BYTES_PER_KILOBYTE = 1024;
+
+    private const SECONDS_PER_HOUR = 3600;
+
+    private const SECONDS_PER_MINUTE = 60;
+
     public function formatDuration(float $seconds): string
     {
-        $hours = floor($seconds / 3600);
-        $minutes = floor(($seconds % 3600) / 60);
-        $secs = $seconds % 60;
+        $hours = floor($seconds / self::SECONDS_PER_HOUR);
+        $minutes = floor(($seconds % self::SECONDS_PER_HOUR) / self::SECONDS_PER_MINUTE);
+        $secs = $seconds % self::SECONDS_PER_MINUTE;
 
         if ($hours > 0) {
             return sprintf('%dh %dm %.2fs', $hours, $minutes, $secs);
@@ -27,10 +33,10 @@ final class FormatterService implements FormatterServiceInterface
     {
         $units = ['B', 'KB', 'MB', 'GB'];
         $bytes = max($bytes, 0);
-        $pow = floor(($bytes !== 0 ? log($bytes) : 0) / log(1024));
+        $pow = floor(($bytes !== 0 ? log($bytes) : 0) / log(self::BYTES_PER_KILOBYTE));
         $pow = min($pow, count($units) - 1);
 
-        $bytes /= (1 << (10 * $pow));
+        $bytes /= pow(self::BYTES_PER_KILOBYTE, $pow);
 
         return round($bytes, 2).' '.$units[$pow];
     }

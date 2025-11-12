@@ -58,14 +58,13 @@ final class ApiResponse extends Data
         return $this->currentPage >= $this->lastPage;
     }
 
+    /**
+     * Extract last page number from pagination data.
+     *
+     * Simplified to use direct pagination fields, falling back to total if not available.
+     */
     private static function extractLastPage(array $pagination): int
     {
-        if (isset($pagination['last_page_url']) && is_string($pagination['last_page_url'])) {
-            parse_str(parse_url($pagination['last_page_url'], PHP_URL_QUERY) ?? '', $params);
-
-            return (int) ($params['page'] ?? 1);
-        }
-
-        return $pagination['total'] ?? 1;
+        return (int) ($pagination['last_page'] ?? $pagination['total'] ?? 1);
     }
 }

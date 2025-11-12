@@ -11,10 +11,14 @@ final class ApiRateLimiter implements RateLimiterInterface
 
     private const WINDOW_SECONDS = 60;
 
+    private readonly string $cacheKey;
+
     public function __construct(
         private readonly int $maxRequests = 10,
         private readonly string $identifier = 'default',
-    ) {}
+    ) {
+        $this->cacheKey = self::CACHE_KEY_PREFIX.$this->identifier;
+    }
 
     /**
      * Check if the rate limit has been exceeded.
@@ -52,7 +56,7 @@ final class ApiRateLimiter implements RateLimiterInterface
         $timestamps[] = time();
 
         Cache::put(
-            $this->getCacheKey(),
+            $this->cacheKey,
             $timestamps,
             now()->addSeconds(self::WINDOW_SECONDS + 10)
         );
@@ -73,7 +77,7 @@ final class ApiRateLimiter implements RateLimiterInterface
      */
     public function clear(): void
     {
-        Cache::forget($this->getCacheKey());
+        Cache::forget($this->cacheKey);
     }
 
     /**
@@ -83,17 +87,12 @@ final class ApiRateLimiter implements RateLimiterInterface
      */
     private function getRequestTimestamps(): array
     {
-        $timestamps = Cache::get($this->getCacheKey(), []);
+        $timestamps = Cache::get($this->cacheKey, []);
         $cutoff = time() - self::WINDOW_SECONDS;
 
         return array_filter(
             $timestamps,
             fn (int $timestamp) => $timestamp > $cutoff
         );
-    }
-
-    private function getCacheKey(): string
-    {
-        return self::CACHE_KEY_PREFIX.$this->identifier;
     }
 }

@@ -56,7 +56,7 @@ final class Product extends Model
      */
     public function scopePublished(Builder $query): Builder
     {
-        return $query->where('status', 'published');
+        return $query->where('status', ProductStatus::PUBLISHED);
     }
 
     /**
@@ -110,42 +110,13 @@ final class Product extends Model
     }
 
     /**
-     * Accessor: Get formatted price with currency.
+     * Get presenter instance for view-related logic.
+     *
+     * View logic has been moved to ProductPresenter following the Presenter pattern.
+     * This provides clean separation between domain model and presentation logic.
      */
-    public function getFormattedPriceAttribute(): string
+    public function present(): \App\Presenters\ProductPresenter
     {
-        return number_format($this->price, 2).' TRY';
-    }
-
-    /**
-     * Accessor: Check if product has discount.
-     */
-    public function getHasDiscountAttribute(): bool
-    {
-        return $this->old_price !== null && $this->old_price > $this->price;
-    }
-
-    /**
-     * Accessor: Get discount amount.
-     */
-    public function getDiscountAmountAttribute(): ?float
-    {
-        if (! $this->has_discount) {
-            return null;
-        }
-
-        return $this->old_price - $this->price;
-    }
-
-    /**
-     * Accessor: Get calculated discount percentage.
-     */
-    public function getCalculatedDiscountPercentageAttribute(): ?int
-    {
-        if (! $this->has_discount) {
-            return null;
-        }
-
-        return (int) round((($this->old_price - $this->price) / $this->old_price) * 100);
+        return new \App\Presenters\ProductPresenter($this);
     }
 }

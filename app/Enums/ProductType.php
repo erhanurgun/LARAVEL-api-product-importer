@@ -18,14 +18,4 @@ enum ProductType: string
             self::RENT => __('products.type.rent'),
         };
     }
-
-    public function isSale(): bool
-    {
-        return $this === self::SALE;
-    }
-
-    public function isRent(): bool
-    {
-        return $this === self::RENT;
-    }
 }

@@ -137,17 +137,67 @@ Uygulama **SOLID prensipleri** doğrultusunda tamamen refactor edilmiş, temiz k
 
 ```
 app/
+├── Actions/                # İş mantığı Action sınıfları (Action Pattern)
 ├── Contracts/              # Interface'ler (Dependency Inversion)
 ├── Enums/                  # Type-safe enum sınıfları
-├── ValueObjects/           # Immutable değer nesneleri
 ├── DataTransferObjects/    # Veri aktarım nesneleri (Spatie Data)
-├── Services/               # İş mantığı servisleri
+├── Presenters/             # View logic (Presenter Pattern)
+├── Services/               # Domain servisleri
+├── Traits/                 # Yeniden kullanılabilir trait'ler
 ├── Console/Commands/       # CLI komutları (sadece orkestrasyon)
-├── Models/                 # Eloquent modeller (scopes, accessors)
+├── Models/                 # Eloquent modeller (scopes, relationships)
 └── Providers/              # Service provider'lar
 ```
 
-### 1. Contracts (Interfaces)
+### 1. Actions (Business Logic)
+
+**Action Pattern** ile business logic izole edilmiştir:
+
+#### ImportProductsAction (`app/Actions/ImportProductsAction.php`)
+
+Tüm product import business logic Action sınıfında:
+- API'den veri çekme orchestration
+- Rate limiting yönetimi
+- Sayfa bazlı işleme
+- Validasyon ve hata yönetimi
+- Database kayıt işlemleri
+- Dry-run modu desteği
+
+**Avantajları:**
+- Command'dan ayrılarak test edilebilir
+- Web controller'lardan yeniden kullanılabilir
+- Queue job'lara taşınabilir
+- Single Responsibility Principle
+
+### 2. Presenters (View Logic)
+
+**Presenter Pattern** ile view logic model'dan ayrılmıştır:
+
+#### ProductPresenter (`app/Presenters/ProductPresenter.php`)
+
+View katmanı için presentation logic:
+- `formattedPrice()`: Fiyat formatlama (1,234.56 TRY)
+- `hasDiscount()`: İndirim kontrolü
+- `discountAmount()`: İndirim miktarı hesaplama
+- `calculatedDiscountPercentage()`: İndirim yüzdesi
+- `formattedOldPrice()`: Eski fiyat formatlama
+- `discountBadge()`: İndirim badge metni (-25%)
+
+**Kullanım:**
+```php
+$product = Product::find($id);
+$presenter = $product->present();
+
+echo $presenter->formattedPrice();        // "1,234.56 TRY"
+echo $presenter->discountBadge();         // "-25%"
+```
+
+**Avantajları:**
+- Model'dan view logic separation
+- Test edilebilir presentation mantığı
+- SRP compliance
+
+### 3. Contracts (Interfaces)
 
 **Dependency Inversion Principle** uygulanarak tüm servisler interface'ler üzerinden tanımlanmıştır:
 
@@ -159,7 +209,7 @@ app/
 - `CheckpointManagerInterface`: Checkpoint yönetim kontratı
 - `FormatterServiceInterface`: Formatlama kontratı
 
-### 2. Enums (Backed Enums)
+### 4. Enums (Backed Enums)
 
 **Type-safe constant değerler** için PHP 8.1+ Backed Enum kullanımı:
 
@@ -195,7 +245,8 @@ enum ProductStatus: string
 
 **Enum'a Özel Metodlar:**
 - `label()`: Çoklu dil desteği ile etiket döndürür
-- `isPublished()`, `isDraft()`, `isArchived()`: Kontrol metodları
+
+**Not:** `isPublished()`, `isDraft()` gibi helper metodları YAGNI prensibi gereği kaldırılmıştır. Direct comparison kullanın: `$status === ProductStatus::PUBLISHED`
 
 #### ProductType (`app/Enums/ProductType.php`)
 ```php
@@ -209,7 +260,7 @@ enum ProductType: string
 ```
 
 **Trait Metodları:** `values()`, `toValidationRule()`, `options()`
-**Enum Metodları:** `label()`, `isSale()`, `isRent()`
+**Enum Metodları:** `label()`
 
 #### ProductCondition (`app/Enums/ProductCondition.php`)
 ```php
@@ -224,7 +275,7 @@ enum ProductCondition: string
 ```
 
 **Trait Metodları:** `values()`, `toValidationRule()`, `options()`
-**Enum Metodları:** `label()`, `isNew()`, `isUsed()`, `isRefurbished()`
+**Enum Metodları:** `label()`
 
 **Kullanım Örneği:**
 ```php
@@ -241,40 +292,9 @@ protected function casts(): array
 $statusOptions = ProductStatus::options();
 ```
 
-### 3. Value Objects
+### 5. Data Transfer Objects (DTOs)
 
-Immutable, type-safe domain nesneleri:
-
-#### Price (`app/ValueObjects/Price.php`)
-- İndirim hesaplamaları
-- Validasyon (negatif fiyat kontrolü)
-- Discount percentage hesaplama
-
-#### Location (`app/ValueObjects/Location.php`)
-- Şehir, ilçe, ülke bilgileri
-- Full address formatlama
-- Completeness kontrolü
-
-#### Stock (`app/ValueObjects/Stock.php`)
-- Miktar ve stok durumu
-- Availability, low stock kontrolleri
-- Business logic encapsulation
-
-#### ContainerInfo (`app/ValueObjects/ContainerInfo.php`)
-- Konteyner tipleri ve boyutları
-- Database format dönüşümü
-
-#### ProductImage (`app/ValueObjects/ProductImage.php`)
-- Cover ve thumbnail yönetimi
-- Image presence kontrolleri
-
-### 4. Data Transfer Objects (DTOs)
-
-**[Spatie Laravel Data](https://github.com/spatie/laravel-data)** paketi ile güçlendirilmiş DTOs:
-
-```bash
-composer require spatie/laravel-data
-```
+**[Spatie Laravel Data](https://github.com/spatie/laravel-data)** paketi ile type-safe DTOs:
 
 #### ImportStatistics (`app/DataTransferObjects/ImportStatistics.php`)
 ```php
@@ -346,7 +366,40 @@ final class ApiResponse extends Data
 - Type-safe veri erişimi
 - `toArray()` otomatik (Spatie Data özelliği)
 
-### 5. Servis Katmanı
+#### ProductData (`app/DataTransferObjects/ProductData.php`)
+
+API response'dan domain model'e type-safe mapping:
+```php
+final class ProductData extends Data
+{
+    #[MapInputName(SnakeCaseMapper::class)]
+    #[MapOutputName(SnakeCaseMapper::class)]
+    public function __construct(
+        public string $id,
+        public string $title,
+        public string $slug,
+        public float $price,
+        public ?float $oldPrice,
+        public ProductStatus $status,
+        public ProductCondition $condition,
+        // ... diğer alanlar
+    ) {}
+
+    public static function fromApiFormat(array $apiProduct): self
+    {
+        // Nested data extraction ve validation
+    }
+}
+```
+
+**Özellikler:**
+- Type-safe API data mapping
+- Automatic snake_case conversion
+- Enum casting otomatik
+- Validation attributes desteği
+- DRY: ProductDataMapper sadece 5 satır
+
+### 6. Servis Katmanı
 
 **Single Responsibility Principle** ile her servis tek bir sorumluluğa sahiptir:
 
@@ -409,7 +462,7 @@ Display formatting tek yerde:
 - Byte formatting (KB/MB/GB)
 - Number formatting
 
-### 6. Model Layer
+### 7. Model Layer
 
 #### Product Model (`app/Models/Product.php`)
 
@@ -445,44 +498,15 @@ protected static function booted(): void
 - `withArchived()`: Global scope'u devre dışı bırakır (arşivlenmiş ürünleri dahil eder)
 - `onlyArchived()`: Sadece arşivlenmiş ürünleri getirir
 
-**Accessors (Computed Properties):**
+**Presenter Integration:**
 ```php
-// Formatlanmış fiyat
-protected function formattedPrice(): Attribute
+public function present(): ProductPresenter
 {
-    return Attribute::make(
-        get: fn () => number_format($this->price, 2).' ₺'
-    );
-}
-
-// İndirim var mı kontrolü
-protected function hasDiscount(): Attribute
-{
-    return Attribute::make(
-        get: fn () => $this->old_price && $this->old_price > $this->price
-    );
-}
-
-// İndirim miktarı
-protected function discountAmount(): Attribute
-{
-    return Attribute::make(
-        get: fn () => $this->hasDiscount
-            ? $this->old_price - $this->price
-            : null
-    );
-}
-
-// Hesaplanan indirim yüzdesi
-protected function calculatedDiscountPercentage(): Attribute
-{
-    return Attribute::make(
-        get: fn () => $this->hasDiscount
-            ? round((($this->old_price - $this->price) / $this->old_price) * 100)
-            : null
-    );
+    return new ProductPresenter($this);
 }
 ```
+
+View-related logic ProductPresenter'a taşınmıştır (Presenter Pattern).
 
 **Kullanım Örnekleri:**
 ```php
@@ -498,23 +522,24 @@ $archivedProducts = Product::onlyArchived()->get();
 // Yayınlanmış ve stokta olan ürünler
 $availableProducts = Product::published()->inStock()->get();
 
-// Accessor kullanımı
+// Presenter kullanımı
 $product = Product::find($id);
-echo $product->formatted_price; // "1,250.00 ₺"
-echo $product->has_discount; // true/false
-echo $product->discount_amount; // 250.50
+$presenter = $product->present();
+echo $presenter->formattedPrice(); // "1,250.00 TRY"
+echo $presenter->hasDiscount(); // true/false
+echo $presenter->discountAmount(); // 250.50
 ```
 
-### 7. Command Layer
+### 8. Command Layer
 
 #### ImportProducts
 `app/Console/Commands/ImportProducts.php`
 
-**Single Responsibility**: Sadece orkestrasyon yapar, business logic servislere delegedir:
-- **357 satırdan 308 satıra** düşürüldü (14% azalma)
-- **6 private property → 0** (DTO kullanımı sayesinde)
-- **Tüm helper metodlar** ilgili servislere taşındı
-- **Interface-based DI** kullanılarak test edilebilirlik artırıldı
+**Action Pattern Integration**: Command artık sadece CLI interaction için:
+- **300+ satırdan 150 satıra** düşürüldü (50% azalma)
+- **Business logic** ImportProductsAction'a taşındı
+- **Sadece user interaction**: Progress bar, çıktı formatlama, error handling
+- **Test edilebilirlik** artırıldı (Action izole test edilebilir)
 
 ### Veritabanı Şeması
 

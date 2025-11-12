@@ -18,11 +18,19 @@ final class ProductSerializer implements SerializerInterface
         'user_info',
     ];
 
+    /**
+     * Serialize product data for database storage.
+     *
+     * @param  array<string, mixed>  $product
+     * @return array<string, mixed>
+     *
+     * @throws \JsonException
+     */
     public function serialize(array $product): array
     {
         foreach (self::JSON_FIELDS as $field) {
             if (isset($product[$field]) && is_array($product[$field])) {
-                $product[$field] = json_encode($product[$field]);
+                $product[$field] = json_encode($product[$field], JSON_THROW_ON_ERROR);
             }
         }
 

@@ -13,7 +13,7 @@ it('fetches products successfully', function () {
             'data' => [
                 'pagination' => [
                     'current_page' => 1,
-                    'last_page_url' => 'https://dummyjson.com?page=5',
+                    'last_page' => 5,
                     'total' => 500,
                 ],
                 'products' => [
