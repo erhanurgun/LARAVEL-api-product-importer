@@ -51,4 +51,21 @@ return [
         'failed' => 'Product validation failed',
     ],
 
+    'status' => [
+        'draft' => 'Draft',
+        'published' => 'Published',
+        'archived' => 'Archived',
+    ],
+
+    'type' => [
+        'sale' => 'For Sale',
+        'rent' => 'For Rent',
+    ],
+
+    'condition' => [
+        'new' => 'New',
+        'used' => 'Used',
+        'refurbished' => 'Refurbished',
+    ],
+
 ];

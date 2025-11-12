@@ -2,15 +2,22 @@
 
 namespace App\DataTransferObjects;
 
-final readonly class ApiResponse
+use Spatie\LaravelData\Attributes\Computed;
+use Spatie\LaravelData\Attributes\Validation\Min;
+use Spatie\LaravelData\Data;
+
+final class ApiResponse extends Data
 {
     /**
      * @param  array<array<string, mixed>>  $data
      */
     public function __construct(
         public array $data,
+        #[Min(1)]
         public int $currentPage,
+        #[Min(1)]
         public int $lastPage,
+        #[Min(0)]
         public int $total,
     ) {}
 
@@ -27,21 +34,25 @@ final readonly class ApiResponse
         );
     }
 
+    #[Computed]
     public function hasData(): bool
     {
         return ! empty($this->data);
     }
 
+    #[Computed]
     public function isEmpty(): bool
     {
         return empty($this->data);
     }
 
+    #[Computed]
     public function hasMorePages(): bool
     {
         return $this->currentPage < $this->lastPage;
     }
 
+    #[Computed]
     public function isLastPage(): bool
     {
         return $this->currentPage >= $this->lastPage;
@@ -56,15 +67,5 @@ final readonly class ApiResponse
         }
 
         return $pagination['total'] ?? 1;
-    }
-
-    public function toArray(): array
-    {
-        return [
-            'data' => $this->data,
-            'current_page' => $this->currentPage,
-            'last_page' => $this->lastPage,
-            'total' => $this->total,
-        ];
     }
 }

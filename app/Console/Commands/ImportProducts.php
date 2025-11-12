@@ -232,7 +232,7 @@ final class ImportProducts extends Command
         Log::channel('import_errors')->critical('Import failed with critical error', [
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
-            'stats' => $stats->toArray(),
+            'stats' => $stats,
         ]);
 
         $checkpoint = $this->checkpointManager->get();
@@ -267,19 +267,19 @@ final class ImportProducts extends Command
                 ],
                 [
                     __('products.summary.success_rate'),
-                    $this->formatter->formatNumber($stats->calculateSuccessRate()).'%',
+                    $this->formatter->formatNumber($stats->successRate()).'%',
                 ],
                 [
                     __('products.summary.total_duration'),
-                    $this->formatter->formatDuration($stats->getDuration()),
+                    $this->formatter->formatDuration($stats->duration()),
                 ],
                 [
                     __('products.summary.memory_used'),
-                    $this->formatter->formatBytes($stats->getMemoryUsed()),
+                    $this->formatter->formatBytes($stats->memoryUsed()),
                 ],
                 [
                     __('products.summary.average_time'),
-                    $this->formatter->formatNumber($stats->getAverageTimePerItem()).'ms',
+                    $this->formatter->formatNumber($stats->averageTimePerItem()).'ms',
                 ],
             ]
         );

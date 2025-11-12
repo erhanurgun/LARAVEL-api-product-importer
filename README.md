@@ -138,11 +138,13 @@ Uygulama **SOLID prensipleri** doğrultusunda tamamen refactor edilmiş, temiz k
 ```
 app/
 ├── Contracts/              # Interface'ler (Dependency Inversion)
+├── Enums/                  # Type-safe enum sınıfları
 ├── ValueObjects/           # Immutable değer nesneleri
-├── DataTransferObjects/    # Veri aktarım nesneleri
+├── DataTransferObjects/    # Veri aktarım nesneleri (Spatie Data)
 ├── Services/               # İş mantığı servisleri
 ├── Console/Commands/       # CLI komutları (sadece orkestrasyon)
-└── Models/                 # Eloquent modeller
+├── Models/                 # Eloquent modeller (scopes, accessors)
+└── Providers/              # Service provider'lar
 ```
 
 ### 1. Contracts (Interfaces)
@@ -157,7 +159,89 @@ app/
 - `CheckpointManagerInterface`: Checkpoint yönetim kontratı
 - `FormatterServiceInterface`: Formatlama kontratı
 
-### 2. Value Objects
+### 2. Enums (Backed Enums)
+
+**Type-safe constant değerler** için PHP 8.1+ Backed Enum kullanımı:
+
+#### HasEnumHelpers Trait (`app/Traits/HasEnumHelpers.php`)
+
+**DRY prensibi** uygulanarak tüm enum'larda kullanılan ortak metodlar bir trait'e taşınmıştır:
+
+```php
+trait HasEnumHelpers
+{
+    public static function values(): array
+    public static function toValidationRule(): string
+    public static function options(): array
+}
+```
+
+#### ProductStatus (`app/Enums/ProductStatus.php`)
+```php
+enum ProductStatus: string
+{
+    use HasEnumHelpers;
+
+    case DRAFT = 'draft';
+    case PUBLISHED = 'published';
+    case ARCHIVED = 'archived';
+}
+```
+
+**Helper Metodları** (Trait'ten gelen):
+- `values()`: Tüm enum değerlerini array olarak döndürür
+- `toValidationRule()`: Laravel validasyon için string döndürür (`'draft,published,archived'`)
+- `options()`: Dropdown'lar için key-value array döndürür
+
+**Enum'a Özel Metodlar:**
+- `label()`: Çoklu dil desteği ile etiket döndürür
+- `isPublished()`, `isDraft()`, `isArchived()`: Kontrol metodları
+
+#### ProductType (`app/Enums/ProductType.php`)
+```php
+enum ProductType: string
+{
+    use HasEnumHelpers;
+
+    case SALE = 'sale';
+    case RENT = 'rent';
+}
+```
+
+**Trait Metodları:** `values()`, `toValidationRule()`, `options()`
+**Enum Metodları:** `label()`, `isSale()`, `isRent()`
+
+#### ProductCondition (`app/Enums/ProductCondition.php`)
+```php
+enum ProductCondition: string
+{
+    use HasEnumHelpers;
+
+    case NEW = 'new';
+    case USED = 'used';
+    case REFURBISHED = 'refurbished';
+}
+```
+
+**Trait Metodları:** `values()`, `toValidationRule()`, `options()`
+**Enum Metodları:** `label()`, `isNew()`, `isUsed()`, `isRefurbished()`
+
+**Kullanım Örneği:**
+```php
+// Validasyon kurallarında
+'status' => ['required', 'string', 'in:'.ProductStatus::toValidationRule()],
+
+// Model casting
+protected function casts(): array
+{
+    return ['status' => ProductStatus::class];
+}
+
+// Dropdown için
+$statusOptions = ProductStatus::options();
+```
+
+### 3. Value Objects
 
 Immutable, type-safe domain nesneleri:
 
@@ -184,19 +268,85 @@ Immutable, type-safe domain nesneleri:
 - Cover ve thumbnail yönetimi
 - Image presence kontrolleri
 
-### 3. Data Transfer Objects (DTOs)
+### 4. Data Transfer Objects (DTOs)
+
+**[Spatie Laravel Data](https://github.com/spatie/laravel-data)** paketi ile güçlendirilmiş DTOs:
+
+```bash
+composer require spatie/laravel-data
+```
 
 #### ImportStatistics (`app/DataTransferObjects/ImportStatistics.php`)
+```php
+final class ImportStatistics extends Data
+{
+    public function __construct(
+        public int $totalProcessed = 0,
+        public int $successfulImports = 0,
+        public int $failedValidations = 0,
+        public float $startTime = 0,
+        public int $startMemory = 0,
+    ) {}
+
+    #[Computed]
+    public function successRate(): float
+
+    #[Computed]
+    public function duration(): float
+
+    #[Computed]
+    public function memoryUsed(): int
+
+    #[Computed]
+    public function averageTimePerItem(): float
+}
+```
+
+**Özellikler:**
 - İstatistik tracking ve hesaplamalar
-- Success rate, duration, memory usage
+- **#[Computed] attribute** ile computed properties
+- Success rate, duration, memory usage otomatik hesaplanır
 - Average time per item hesaplama
+- Auto-casting ve type safety (Spatie Data)
+- `toArray()` otomatik (Spatie Data özelliği)
 
 #### ApiResponse (`app/DataTransferObjects/ApiResponse.php`)
-- API yanıt normalizasyonu
-- Pagination helper metodları
-- Type-safe veri erişimi
+```php
+final class ApiResponse extends Data
+{
+    public function __construct(
+        public array $data,
+        #[Min(1)]
+        public int $currentPage,
+        #[Min(1)]
+        public int $lastPage,
+        #[Min(0)]
+        public int $total,
+    ) {}
 
-### 4. Servis Katmanı
+    #[Computed]
+    public function hasData(): bool
+
+    #[Computed]
+    public function isEmpty(): bool
+
+    #[Computed]
+    public function hasMorePages(): bool
+
+    #[Computed]
+    public function isLastPage(): bool
+}
+```
+
+**Özellikler:**
+- API yanıt normalizasyonu
+- **#[Min] validation attributes** ile otomatik validasyon
+- **#[Computed] attribute** ile computed properties
+- Pagination helper metodları otomatik hesaplanır
+- Type-safe veri erişimi
+- `toArray()` otomatik (Spatie Data özelliği)
+
+### 5. Servis Katmanı
 
 **Single Responsibility Principle** ile her servis tek bir sorumluluğa sahiptir:
 
@@ -259,7 +409,103 @@ Display formatting tek yerde:
 - Byte formatting (KB/MB/GB)
 - Number formatting
 
-### 5. Command Layer
+### 6. Model Layer
+
+#### Product Model (`app/Models/Product.php`)
+
+**Enum Integration:**
+```php
+protected function casts(): array
+{
+    return [
+        'status' => ProductStatus::class,
+        'type' => ProductType::class,
+        'condition' => ProductCondition::class,
+        // ... diğer cast'ler
+    ];
+}
+```
+
+**Global Scope - Auto-Exclude Archived:**
+```php
+protected static function booted(): void
+{
+    self::addGlobalScope('excludeArchived', function (Builder $builder) {
+        $builder->where('status', '!=', ProductStatus::ARCHIVED->value);
+    });
+}
+```
+
+**Query Scopes:**
+- `published()`: Yayınlanmış ürünleri filtreler
+- `inStock()`: Stokta olan ürünleri filtreler
+- `featured()`: Öne çıkan ürünleri filtreler
+- `hotSale()`: Hot sale ürünlerini filtreler
+- `withDiscount()`: İndirimli ürünleri filtreler
+- `withArchived()`: Global scope'u devre dışı bırakır (arşivlenmiş ürünleri dahil eder)
+- `onlyArchived()`: Sadece arşivlenmiş ürünleri getirir
+
+**Accessors (Computed Properties):**
+```php
+// Formatlanmış fiyat
+protected function formattedPrice(): Attribute
+{
+    return Attribute::make(
+        get: fn () => number_format($this->price, 2).' ₺'
+    );
+}
+
+// İndirim var mı kontrolü
+protected function hasDiscount(): Attribute
+{
+    return Attribute::make(
+        get: fn () => $this->old_price && $this->old_price > $this->price
+    );
+}
+
+// İndirim miktarı
+protected function discountAmount(): Attribute
+{
+    return Attribute::make(
+        get: fn () => $this->hasDiscount
+            ? $this->old_price - $this->price
+            : null
+    );
+}
+
+// Hesaplanan indirim yüzdesi
+protected function calculatedDiscountPercentage(): Attribute
+{
+    return Attribute::make(
+        get: fn () => $this->hasDiscount
+            ? round((($this->old_price - $this->price) / $this->old_price) * 100)
+            : null
+    );
+}
+```
+
+**Kullanım Örnekleri:**
+```php
+// Arşivlenmiş ürünler otomatik olarak hariç tutulur
+$products = Product::all();
+
+// Arşivlenmiş ürünleri dahil et
+$allProducts = Product::withArchived()->get();
+
+// Sadece arşivlenmiş ürünler
+$archivedProducts = Product::onlyArchived()->get();
+
+// Yayınlanmış ve stokta olan ürünler
+$availableProducts = Product::published()->inStock()->get();
+
+// Accessor kullanımı
+$product = Product::find($id);
+echo $product->formatted_price; // "1,250.00 ₺"
+echo $product->has_discount; // true/false
+echo $product->discount_amount; // 250.50
+```
+
+### 7. Command Layer
 
 #### ImportProducts
 `app/Console/Commands/ImportProducts.php`
@@ -401,9 +647,25 @@ Bu komut şunları başlatır:
 
 ## Yapılandırma Dosyaları
 
-### Service Provider
+### Service Providers
 
-`app/Providers/AppServiceProvider.php` **Dependency Injection Container** yapılandırması:
+**Separation of Concerns** prensibi ile import servisleri ayrı provider'da yönetilir:
+
+#### ImportServiceProvider (`app/Providers/ImportServiceProvider.php`)
+
+**Dependency Injection Container** yapılandırması:
+
+```php
+final class ImportServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->registerApiServices();
+        $this->registerDataServices();
+        $this->registerUtilityServices();
+    }
+}
+```
 
 **Interface → Implementation bindings:**
 - `ApiClientInterface` → `ProductApiClient`
@@ -418,6 +680,20 @@ Bu komut şunları başlatır:
 1. **API Services**: Client + Rate Limiter
 2. **Data Services**: Mapper + Validator + Serializer
 3. **Utility Services**: Checkpoint + Formatter
+
+**Avantajları:**
+- AppServiceProvider karmaşıklaşmaz
+- Import servisleri izole edilir
+- Test ve bakım kolaylaşır
+- Modüler yapı sağlanır
+
+#### Provider Kaydı (`bootstrap/providers.php`)
+```php
+return [
+    App\Providers\AppServiceProvider::class,
+    App\Providers\ImportServiceProvider::class,
+];
+```
 
 ### Günlük Tutma
 

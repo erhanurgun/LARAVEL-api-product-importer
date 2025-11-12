@@ -51,4 +51,21 @@ return [
         'failed' => 'Ürün doğrulama başarısız oldu',
     ],
 
+    'status' => [
+        'draft' => 'Taslak',
+        'published' => 'Yayınlandı',
+        'archived' => 'Arşivlendi',
+    ],
+
+    'type' => [
+        'sale' => 'Satılık',
+        'rent' => 'Kiralık',
+    ],
+
+    'condition' => [
+        'new' => 'Yeni',
+        'used' => 'İkinci El',
+        'refurbished' => 'Yenilenmiş',
+    ],
+
 ];

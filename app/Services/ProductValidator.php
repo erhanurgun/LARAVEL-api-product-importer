@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Contracts\ValidatorInterface;
+use App\Enums\ProductCondition;
+use App\Enums\ProductStatus;
+use App\Enums\ProductType;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -93,17 +96,17 @@ final class ProductValidator implements ValidatorInterface
             'container_type' => ['nullable', 'string'],
             'container_size' => ['nullable', 'string'],
             'production_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
-            'condition' => ['nullable', 'string', 'in:new,used,refurbished'],
+            'condition' => ['nullable', 'string', 'in:'.ProductCondition::toValidationRule()],
             'location_city' => ['nullable', 'string'],
             'location_district' => ['nullable', 'string'],
             'location_country' => ['nullable', 'string'],
-            'type' => ['nullable', 'string', 'in:sale,rent'],
+            'type' => ['nullable', 'string', 'in:'.ProductType::toValidationRule()],
             'is_new' => ['nullable', 'boolean'],
             'is_hot_sale' => ['nullable', 'boolean'],
             'is_featured' => ['nullable', 'boolean'],
             'is_bulk_sale' => ['nullable', 'boolean'],
             'accept_offers' => ['nullable', 'boolean'],
-            'status' => ['required', 'string', 'in:draft,published,archived'],
+            'status' => ['required', 'string', 'in:'.ProductStatus::toValidationRule()],
             'colors' => ['nullable', 'array'],
             'all_prices' => ['nullable', 'array'],
             'technical_specs' => ['nullable', 'array'],

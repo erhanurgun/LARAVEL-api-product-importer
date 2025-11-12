@@ -2,7 +2,10 @@
 
 namespace App\DataTransferObjects;
 
-final class ImportStatistics
+use Spatie\LaravelData\Attributes\Computed;
+use Spatie\LaravelData\Data;
+
+final class ImportStatistics extends Data
 {
     public function __construct(
         public int $totalProcessed = 0,
@@ -24,7 +27,8 @@ final class ImportStatistics
         $this->totalProcessed++;
     }
 
-    public function calculateSuccessRate(): float
+    #[Computed]
+    public function successRate(): float
     {
         if ($this->totalProcessed === 0) {
             return 0.0;
@@ -33,35 +37,25 @@ final class ImportStatistics
         return ($this->successfulImports / $this->totalProcessed) * 100;
     }
 
-    public function getDuration(): float
+    #[Computed]
+    public function duration(): float
     {
         return microtime(true) - $this->startTime;
     }
 
-    public function getMemoryUsed(): int
+    #[Computed]
+    public function memoryUsed(): int
     {
         return memory_get_usage(true) - $this->startMemory;
     }
 
-    public function getAverageTimePerItem(): float
+    #[Computed]
+    public function averageTimePerItem(): float
     {
         if ($this->totalProcessed === 0) {
             return 0.0;
         }
 
-        return ($this->getDuration() / $this->totalProcessed) * 1000; // in milliseconds
-    }
-
-    public function toArray(): array
-    {
-        return [
-            'total_processed' => $this->totalProcessed,
-            'successful_imports' => $this->successfulImports,
-            'failed_validations' => $this->failedValidations,
-            'success_rate' => $this->calculateSuccessRate(),
-            'duration' => $this->getDuration(),
-            'memory_used' => $this->getMemoryUsed(),
-            'average_time_per_item' => $this->getAverageTimePerItem(),
-        ];
+        return ($this->duration() / $this->totalProcessed) * 1000; // in milliseconds
     }
 }
