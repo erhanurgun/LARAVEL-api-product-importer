@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'product_api' => [
+        'base_url' => env('PRODUCT_API_BASE_URL', 'https://dummyjson.com/products'),
+        'api_key' => env('PRODUCT_API_KEY'),
+        'rate_limit' => env('PRODUCT_API_RATE_LIMIT', 10),
+    ],
+
 ];
